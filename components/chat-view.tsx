@@ -29,7 +29,19 @@ import { MessageRenderer } from "@/app/components/message-renderer";
 import { extractMessageText, extractCitationUrls } from "@/lib/message-utils";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import {
+  AlertCircle,
+  ArrowRight,
+  ChevronDown,
+  ChevronUp,
+} from "lucide-react";
+
+const STARTER_PROMPTS: ReadonlyArray<string> = [
+  "What does the evidence say about creatine for cognition?",
+  "Compare mainstream cardiology and Peter Attia on LDL.",
+  "Is the case against seed oils real or overstated?",
+  "What's the honest read on intermittent vs. extended fasting?",
+];
 
 function useMessageVisibility(messages: UIMessage[]) {
   const [overrideForId, setOverrideForId] = useState<string | null>(null);
@@ -147,10 +159,46 @@ export function ChatView({
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
       {emptyState ? (
-        <div className="flex flex-1 flex-col items-center justify-center px-4 text-center">
-          <p className="text-base text-muted-foreground">
-            Ask anything about a health topic, perspective, or report.
-          </p>
+        <div
+          className={cn(
+            "flex flex-1 flex-col items-center justify-center overflow-y-auto px-4 pt-10",
+            "pb-[calc(var(--composer-offset)+env(safe-area-inset-bottom))]",
+            "md:pb-10",
+          )}
+        >
+          <div className="mx-auto flex w-full max-w-[var(--container-max-w)] flex-col items-center text-center">
+            <h1 className="text-2xl font-medium tracking-tight text-foreground md:text-3xl">
+              Health Triangulation
+            </h1>
+            <p className="mt-3 max-w-md text-sm text-muted-foreground md:text-base">
+              Rigorously triangulate health questions across primary sources,
+              perspectives, and the current evidence.
+            </p>
+            <div className="mt-10 flex w-full max-w-[36rem] flex-col gap-0.5">
+              {STARTER_PROMPTS.map((prompt) => (
+                <button
+                  key={prompt}
+                  type="button"
+                  onClick={() => sendMessage({ text: prompt })}
+                  className={cn(
+                    "group flex items-start gap-3 rounded-md px-3 py-2.5 text-left text-sm",
+                    "text-muted-foreground transition-colors",
+                    "hover:bg-muted/50 hover:text-foreground",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
+                  )}
+                >
+                  <ArrowRight
+                    className={cn(
+                      "mt-px size-3.5 shrink-0 text-muted-foreground/60",
+                      "transition-all group-hover:translate-x-0.5 group-hover:text-foreground/80",
+                    )}
+                    aria-hidden="true"
+                  />
+                  <span className="leading-snug">{prompt}</span>
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       ) : (
         <Conversation className="w-full flex-1 min-h-0">
@@ -162,21 +210,26 @@ export function ChatView({
           >
             <>
               {hasPreviousMessages && (
-                <div className="w-full flex justify-center py-2">
+                <div className="flex w-full justify-center py-2">
                   <Button
                     onClick={togglePreviousMessages}
                     size="sm"
-                    variant="outline"
+                    variant="ghost"
                     type="button"
-                    className="h-7 gap-1"
+                    className={cn(
+                      "h-7 gap-1.5 px-2.5 text-xs font-normal",
+                      "text-muted-foreground hover:text-foreground hover:bg-muted/60",
+                    )}
                   >
                     {showPreviousMessages ? (
                       <>
-                        <ChevronUp className="h-3.5 w-3.5" /> Hide previous
+                        <ChevronUp className="size-3.5" aria-hidden="true" />
+                        Hide previous
                       </>
                     ) : (
                       <>
-                        <ChevronDown className="h-3.5 w-3.5" /> Show previous
+                        <ChevronDown className="size-3.5" aria-hidden="true" />
+                        Show previous
                       </>
                     )}
                   </Button>
@@ -260,13 +313,25 @@ export function ChatView({
 
       {showError && (
         <div className="mx-auto w-full max-w-[var(--container-max-w)] px-4 pb-2">
-          <div className="rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 flex items-center justify-between gap-3">
-            <p className="text-sm text-destructive">{error.message}</p>
+          <div
+            role="alert"
+            className={cn(
+              "flex items-start gap-3 rounded-lg border border-destructive/40 bg-destructive/[0.06] px-4 py-3",
+              "motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-bottom-1",
+            )}
+          >
+            <AlertCircle
+              className="mt-0.5 size-4 shrink-0 text-destructive"
+              aria-hidden="true"
+            />
+            <p className="flex-1 text-sm leading-relaxed text-destructive">
+              {error.message}
+            </p>
             <Button
               variant="ghost"
               size="sm"
               onClick={() => setDismissedErrorMsg(error.message)}
-              className="shrink-0 text-destructive hover:text-destructive"
+              className="-my-1 -mr-2 h-7 shrink-0 px-2 text-xs text-destructive/80 hover:bg-destructive/10 hover:text-destructive"
             >
               Dismiss
             </Button>

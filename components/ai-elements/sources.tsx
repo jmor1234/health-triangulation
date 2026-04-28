@@ -6,7 +6,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
-import { BookIcon, ChevronDownIcon } from "lucide-react";
+import { BookIcon, ChevronDownIcon, ChevronUpIcon } from "lucide-react";
 import type { ComponentProps } from "react";
 import { useState } from "react";
 
@@ -31,18 +31,23 @@ export const SourcesTrigger = ({
 }: ComponentProps<typeof CollapsibleTrigger> & { count: number }) => (
   <CollapsibleTrigger
     className={cn(
-      "group inline-flex items-center gap-2 rounded-md border px-2 py-1",
-      "cursor-pointer select-none transition-colors text-muted-foreground hover:text-foreground hover:bg-muted/40",
+      "group inline-flex items-center gap-2 rounded-md border border-border/70 px-2.5 py-1",
+      "cursor-pointer select-none transition-colors",
+      "text-muted-foreground hover:text-foreground hover:border-border hover:bg-muted/50",
       "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
-      "data-[state=open]:bg-muted/60",
+      "data-[state=open]:bg-muted/60 data-[state=open]:text-foreground data-[state=open]:border-border",
       className,
     )}
     {...props}
   >
     {children ?? (
       <>
-        <p className="font-medium tabular-nums">Sources · {count}</p>
-        <ChevronDownIcon className="h-4 w-4 transition-transform group-data-[state=open]:rotate-180" />
+        <span className="font-medium tracking-tight">Sources</span>
+        <span className="text-muted-foreground/70 tabular-nums">{count}</span>
+        <ChevronDownIcon
+          className="size-3.5 transition-transform duration-200 group-data-[state=open]:rotate-180"
+          aria-hidden="true"
+        />
       </>
     )}
   </CollapsibleTrigger>
@@ -54,11 +59,10 @@ export const SourcesContent = ({
 }: ComponentProps<typeof CollapsibleContent>) => (
   <CollapsibleContent
     className={cn(
-      "mt-2 w-full max-w-[720px] rounded-lg border bg-muted/20 p-2 shadow-sm",
-      "flex flex-col gap-2",
+      "mt-2 w-full max-w-[720px] rounded-lg border border-border/70 bg-muted/20 p-1.5",
       "motion-safe:data-[state=closed]:animate-out motion-safe:data-[state=open]:animate-in",
       "motion-safe:data-[state=closed]:fade-out-0 motion-safe:data-[state=closed]:slide-out-to-top-2",
-      "motion-safe:data-[state=open]:slide-in-from-top-2 outline-none",
+      "motion-safe:data-[state=open]:fade-in-0 motion-safe:data-[state=open]:slide-in-from-top-2 outline-none",
       className,
     )}
     {...props}
@@ -84,6 +88,11 @@ export const SourceListItem = ({
   const favicon = parsedDomain
     ? `https://www.google.com/s2/favicons?domain=${parsedDomain}&sz=32`
     : undefined;
+  const showDomain =
+    parsedDomain &&
+    title &&
+    title.trim().length > 0 &&
+    title.trim() !== parsedDomain;
 
   return (
     <li className={cn("list-none", className)}>
@@ -92,8 +101,9 @@ export const SourceListItem = ({
         rel="noopener noreferrer"
         target="_blank"
         className={cn(
-          "group flex items-center gap-2 min-h-6 -mx-1.5 px-1.5 rounded-md",
-          "cursor-pointer transition-colors hover:bg-muted/40",
+          "group flex items-center gap-2.5 min-h-7 px-2 py-1 rounded-md",
+          "cursor-pointer transition-colors",
+          "hover:bg-muted/60",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
         )}
         aria-label={
@@ -111,21 +121,23 @@ export const SourceListItem = ({
             aria-hidden="true"
             width={14}
             height={14}
-            className="h-[14px] w-[14px] rounded-sm"
+            className="size-[14px] shrink-0 rounded-sm"
             onError={(e) => {
               (e.target as HTMLImageElement).style.display = "none";
             }}
           />
         ) : (
           <BookIcon
-            className="h-3.5 w-3.5 text-muted-foreground"
+            className="size-3.5 shrink-0 text-muted-foreground"
             aria-hidden="true"
           />
         )}
-        <span className="truncate">{label}</span>
-        {parsedDomain && (
-          <span className="ml-1 hidden truncate text-muted-foreground/70 sm:inline">
-            ({parsedDomain})
+        <span className="truncate text-foreground/90 group-hover:text-foreground">
+          {label}
+        </span>
+        {showDomain && (
+          <span className="ml-auto shrink-0 truncate pl-2 text-[11px] text-muted-foreground/70 group-hover:text-muted-foreground">
+            {parsedDomain}
           </span>
         )}
       </a>
@@ -144,10 +156,12 @@ export const SourceList = ({
 }) => {
   const [expanded, setExpanded] = useState(false);
   const visible = expanded ? items : items.slice(0, initialCount);
+  const hasMore = items.length > initialCount;
+  const remaining = items.length - initialCount;
 
   return (
     <div className={cn("w-full", className)} {...props}>
-      <ul className="space-y-1">
+      <ul>
         {visible.map((s, i) => (
           <SourceListItem
             key={`${s.url}-${i}`}
@@ -157,13 +171,28 @@ export const SourceList = ({
           />
         ))}
       </ul>
-      {items.length > initialCount && !expanded && (
+      {hasMore && (
         <button
           type="button"
-          className="mt-1 text-[11px] text-muted-foreground underline-offset-2 hover:underline hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 rounded-sm"
-          onClick={() => setExpanded(true)}
+          aria-expanded={expanded}
+          className={cn(
+            "mt-1 inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px]",
+            "text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
+          )}
+          onClick={() => setExpanded((v) => !v)}
         >
-          Show all
+          {expanded ? (
+            <>
+              <ChevronUpIcon className="size-3" aria-hidden="true" />
+              Show fewer
+            </>
+          ) : (
+            <>
+              <ChevronDownIcon className="size-3" aria-hidden="true" />
+              Show {remaining} more
+            </>
+          )}
         </button>
       )}
     </div>

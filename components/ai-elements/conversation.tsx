@@ -58,7 +58,10 @@ export const ConversationScrollButton = ({
     <Button
       aria-label="Scroll to bottom"
       className={cn(
-        "absolute bottom-4 left-[50%] translate-x-[-50%] rounded-full",
+        "absolute bottom-3 left-[50%] -translate-x-1/2 rounded-full",
+        "size-8 bg-background/95 backdrop-blur-sm shadow-sm border-border/70",
+        "hover:bg-background hover:border-border",
+        "motion-safe:animate-in motion-safe:fade-in-0 motion-safe:zoom-in-95",
         className,
       )}
       onClick={handleScrollToBottom}
@@ -67,7 +70,7 @@ export const ConversationScrollButton = ({
       variant="outline"
       {...props}
     >
-      <ArrowDownIcon className="size-4" />
+      <ArrowDownIcon className="size-3.5" aria-hidden="true" />
     </Button>
   );
 };

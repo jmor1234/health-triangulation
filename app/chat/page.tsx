@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { getLatestThread, createThread } from "@/lib/thread-store";
+import { Loader } from "@/components/ai-elements/loader";
 
 export default function ChatIndexPage() {
   const router = useRouter();
@@ -19,5 +20,14 @@ export default function ChatIndexPage() {
     })();
   }, [router]);
 
-  return null;
+  return (
+    <div
+      className="flex flex-1 items-center justify-center"
+      aria-busy="true"
+      aria-live="polite"
+    >
+      <Loader className="text-muted-foreground/60" size={20} />
+      <span className="sr-only">Loading conversation…</span>
+    </div>
+  );
 }

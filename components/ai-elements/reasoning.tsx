@@ -60,34 +60,48 @@ export const Reasoning = memo(({ text, state, className }: ReasoningProps) => {
       open={isOpen}
       onOpenChange={setIsOpen}
     >
-      <CollapsibleTrigger className="flex w-full items-center gap-2 text-muted-foreground text-sm transition-colors hover:text-foreground">
-        <BrainIcon className="size-4" />
-        <p>{label}</p>
+      <CollapsibleTrigger
+        className={cn(
+          "group flex w-full items-center gap-2 text-sm",
+          "text-muted-foreground transition-colors hover:text-foreground",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 rounded-sm",
+        )}
+      >
+        <BrainIcon
+          className="size-3.5 text-muted-foreground/70 group-hover:text-muted-foreground"
+          aria-hidden="true"
+        />
+        <span className="font-medium tracking-tight">{label}</span>
         <span
           className={cn(
             "size-1.5 rounded-full transition-colors",
-            isStreaming ? "bg-accent-brand animate-pulse" : "bg-muted-foreground/40",
+            isStreaming
+              ? "bg-accent-brand animate-pulse"
+              : "bg-muted-foreground/30",
           )}
           aria-hidden="true"
         />
         <ChevronDownIcon
           className={cn(
-            "size-4 transition-transform ml-auto",
+            "ml-auto size-3.5 text-muted-foreground/60 transition-transform duration-200",
             isOpen ? "rotate-180" : "rotate-0",
           )}
+          aria-hidden="true"
         />
       </CollapsibleTrigger>
       <CollapsibleContent
         className={cn(
-          "mt-2 text-xs text-muted-foreground outline-none",
+          "mt-2 outline-none",
           "motion-safe:data-[state=closed]:animate-out motion-safe:data-[state=open]:animate-in",
           "motion-safe:data-[state=closed]:fade-out-0 motion-safe:data-[state=closed]:slide-out-to-top-2",
-          "motion-safe:data-[state=open]:slide-in-from-top-2",
+          "motion-safe:data-[state=open]:fade-in-0 motion-safe:data-[state=open]:slide-in-from-top-2",
         )}
       >
-        <span className="whitespace-pre-wrap leading-snug">
-          {text.replace(/\n{2,}/g, "\n")}
-        </span>
+        <div className="ml-[7px] border-l border-border/70 pl-4 py-1">
+          <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-muted-foreground">
+            {text.replace(/\n{2,}/g, "\n")}
+          </p>
+        </div>
       </CollapsibleContent>
     </Collapsible>
   );
