@@ -75,7 +75,7 @@ export async function POST(req: Request) {
         providerOptions: {
           anthropic: {
             thinking: { type: 'adaptive' },
-            effort: 'high',
+            effort: 'medium',
             display: 'summarized',
             contextManagement: {
               edits: [

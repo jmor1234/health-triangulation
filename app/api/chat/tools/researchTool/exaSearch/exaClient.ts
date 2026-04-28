@@ -2,14 +2,25 @@ import Exa from 'exa-js';
 import { exaRateLimiter } from './rateLimiter';
 import type { ExaSearchResponse, ExaSearchResult, SearchOptions } from './types';
 
-const exa = new Exa(process.env.EXA_API_KEY);
+// Lazy-init so module load doesn't fail at build time when EXA_API_KEY is unset.
+let exaClient: Exa | null = null;
+function getExa(): Exa {
+  if (!exaClient) {
+    const key = process.env.EXA_API_KEY;
+    if (!key) {
+      throw new Error('EXA_API_KEY environment variable is not set');
+    }
+    exaClient = new Exa(key);
+  }
+  return exaClient;
+}
 
 export async function searchExa(
   query: string,
   options?: SearchOptions,
 ): Promise<ExaSearchResponse> {
   return exaRateLimiter.schedule(async () => {
-    const response = await exa.search(query, {
+    const response = await getExa().search(query, {
       type: 'auto' as const,
       numResults: 3,
       contents: {
@@ -43,7 +54,7 @@ export async function getContents(
   maxCharacters: number = 400_000,
 ): Promise<string> {
   return exaRateLimiter.schedule(async () => {
-    const response = await exa.getContents([url], {
+    const response = await getExa().getContents([url], {
       text: { maxCharacters },
     });
 
@@ -63,7 +74,7 @@ export async function getHighlights(
   maxCharacters: number = 10_000,
 ): Promise<{ url: string; title: string; highlights: string[] }> {
   return exaRateLimiter.schedule(async () => {
-    const response = await exa.getContents([url], {
+    const response = await getExa().getContents([url], {
       highlights: { maxCharacters, query },
     });
 
