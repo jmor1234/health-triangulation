@@ -59,7 +59,7 @@ export async function POST(req: Request) {
     `[Route] System messages: ${systemMessages.length}, Model messages: ${modelMessages.length}`,
   );
   console.log(
-    `[Route] Streaming with Opus 4.7 (thinking: adaptive, effort: high, display: summarized, max steps: 50)`,
+    `[Route] Streaming with Opus 4.7 (thinking: adaptive, effort: medium, display: summarized, max steps: 50)`,
   );
 
   const stream = createUIMessageStream({
