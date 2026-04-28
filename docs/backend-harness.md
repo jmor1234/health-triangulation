@@ -1,6 +1,6 @@
 # Backend Harness — Current State
 
-The orchestration + retrieval layer for Health Triangulation. The methodology layer (system prompt, calibration schemas, report-analysis flow) is **not yet built** — what's here is the harness that those layers will sit on top of.
+The orchestration + retrieval layer for Health Triangulation. The methodology layer (system prompt, calibration schemas, report-analysis flow) is **not yet built** — what's here is the harness that those layers will sit on top of. The frontend chat shell that consumes this harness is documented separately in `frontend-shell.md`.
 
 ---
 
@@ -17,13 +17,13 @@ The orchestration + retrieval layer for Health Triangulation. The methodology la
 - Per-request telemetry: tool counts, token usage, cache hit rate, cost vs. baseline, context-edit events
 
 **Placeholder (deliberate):**
-- `systemPrompt.ts` — minimal instructions to verify end-to-end. The methodology prompt (faithful extraction, context-aware reading, calibrated honest verdicts) replaces this once the frontend exists.
+- `systemPrompt.ts` — minimal instructions used to verify end-to-end. The methodology prompt (faithful extraction, context-aware reading, calibrated honest verdicts) replaces this next.
 
 **Not built yet:**
-- Frontend (chat shell, message rendering, sources drawer, reasoning blocks, calibration UI)
+- Methodology system prompt (the actual product)
 - Report-analysis flow (provider epistemic profile + three-layer schema)
 - User-belief in-chat interview behavior
-- Calibration tier as structured output / visible commitment
+- Calibration tier as structured output / visible commitment / UI badges
 
 ---
 
@@ -33,7 +33,7 @@ The orchestration + retrieval layer for Health Triangulation. The methodology la
 |---|---|
 | Framework | Next.js 16 (App Router) + TypeScript |
 | Agent harness | Vercel AI SDK v6 (`streamText`, `generateObject`, tool system, `createUIMessageStream`) |
-| Primary model | Claude Opus 4.7 — `effort: 'high'`, `thinking: { type: 'adaptive' }`, `display: 'summarized'` |
+| Primary model | Claude Opus 4.7 — `effort: 'medium'`, `thinking: { type: 'adaptive' }`, `display: 'summarized'` |
 | Depth extraction | Gemini 3 Flash (`gemini-3-flash-preview`) — single-document structured output |
 | Search | Exa (`exa-js`) — semantic search with highlights @ 1250 chars; read tool @ 10K chars |
 | Validation | Zod (tool input schemas, structured outputs) |
@@ -45,7 +45,7 @@ The orchestration + retrieval layer for Health Triangulation. The methodology la
 ```
 ┌──────────────────────────────────────────────────────────────┐
 │                  Primary Agent (Opus 4.7)                    │
-│        Adaptive thinking · effort: high · display: summarized │
+│      Adaptive thinking · effort: medium · display: summarized │
 ├──────────────────┬──────────────────┬────────────────────────┤
 │     search       │      read        │        depth           │
 │  Exa semantic    │  Exa highlights  │  Exa contents +        │
@@ -164,7 +164,6 @@ The reference at `docs/other-project.md` is the lineage. Adaptations made for th
 | Change | Reason |
 |---|---|
 | Sonnet 4.6 → **Opus 4.7** | Methodology demands stronger calibration discipline + verdict-under-pressure |
-| Effort `medium` → **`high`** | Multi-fidelity discipline + calibrated commitments warrant deliberation |
 | Added **`display: 'summarized'`** | Reasoning text needs to surface to UI for transparency-as-audit (per concept doc) |
 | Search categories pruned + extended | `tweet` removed by Exa; `pdf`, `people` added; `financial report` and `company` dropped as irrelevant |
 | Added **`maxAgeHours`** to search | Replaces deprecated `livecrawl`; gives the agent freshness control for time-sensitive health queries |
@@ -202,11 +201,7 @@ The reference at `docs/other-project.md` is the lineage. Adaptations made for th
 
 - `npx tsc --noEmit` — clean
 - `npm run lint` — clean (eslint config updated to honor `_`-prefix unused convention)
-- End-to-end runtime not yet exercised — two minor unknowns until first invocation:
-  - `display: 'summarized'` placement at `providerOptions.anthropic` top level
-  - Tool-level cache breakpoint via `providerOptions.anthropic.cacheControl` on the last tool
-
-Both will surface immediately at first request if wrong; both are local fixes.
+- End-to-end runtime exercised via the chat shell — tool calls fire, summarized thinking surfaces in the stream, three-tier cache hits as expected, telemetry log shape confirmed.
 
 ---
 
@@ -214,11 +209,9 @@ Both will surface immediately at first request if wrong; both are local fixes.
 
 In approximate order:
 
-1. **Frontend chat shell** — needs design thought (per user direction). Will port from the reference's ai-elements (conversation, message, response, reasoning, tool-status, sources) with `useChat` updated to `DefaultChatTransport`.
-2. **First end-to-end smoke test** — verify caching, thinking display, tool calls, telemetry log shape.
-3. **System prompt rewrite** — the methodology layer. Intent + role + way of being. Compact, not a rules list. Calibration tier mechanism decided here (schema-as-contract vs. prompt-as-guideline).
-4. **Report-analysis flow** — file upload → provider epistemic profile → three-layer structured analysis (findings / interpretations / recommendations). Likely a `generateObject` sub-call with a health-report-aware schema, invoked when a file part is attached.
-5. **Calibration UI** — visible tier badges, source attribution per perspective, layer markers on report analysis. Transparency surfaces that make the methodology auditable.
-6. **Compaction event surfacing** — render distinctly when `providerMetadata.anthropic.type === 'compaction'` so the user knows when context was summarized.
+1. **System prompt rewrite** — the methodology layer. Intent + role + way of being. Compact, not a rules list. Calibration tier mechanism decided here (schema-as-contract vs. prompt-as-guideline).
+2. **Report-analysis flow** — file upload → provider epistemic profile → three-layer structured analysis (findings / interpretations / recommendations). Likely a `generateObject` sub-call with a health-report-aware schema, invoked when a file part is attached.
+3. **Calibration UI** — visible tier badges, source attribution per perspective, layer markers on report analysis. Transparency surfaces that make the methodology auditable. (Mount points already flagged in the frontend doc.)
+4. **Compaction event surfacing** — render distinctly when an applied edit of `type: 'compact_20260112'` shows up in step metadata, so the user knows when context was summarized.
 
-The harness is the foundation. **The methodology is the product** — which is why the system prompt + schemas + UI surfaces are where the next real work lives.
+The harness is the foundation. The frontend chat shell is the surface (see `frontend-shell.md`). **The methodology is the product** — which is why the system prompt + schemas + UI surfaces are where the next real work lives.
