@@ -2,6 +2,8 @@
 
 > Extract what a public health figure actually says on a topic — and triangulate it honestly against the best evidence.
 
+**Try it free:** [health-triangulation.vercel.app](https://health-triangulation.vercel.app/) — no setup required.
+
 A conversational tool that takes a rigorous epistemic methodology — full-context primary-source extraction paired with calibrated honest assessment — and generalizes it across any public health figure, any topic, any combination.
 
 The unit of work is **a perspective to triangulate**, not a research question. That's what makes it different from a general health research agent.
@@ -25,39 +27,17 @@ For the full conceptual intent and design philosophy, see [`docs/conceptual-inte
 
 ---
 
-## What Makes It Different
-
-A general research agent answers *"what does the evidence say about X?"* — and dozens of tools do that.
-
-This app does something only it does:
-
-- **Figure-driven, not query-driven.** The canonical input is a *figure-on-topic*, not a generic research question.
-- **Two-pass retrieval discipline.** A figure's primary sources tell you what they *claim*. They are not — and cannot be — evidence about whether the claim is true. Triangulation requires a *second, independent retrieval act* on the underlying research, separate from anything the figure wrote, cited, or framed.
-- **Calibrated honest verdict that holds under pressure.** Six-tier honesty scale. The verdict doesn't soften when the user pushes back, doesn't harden to seem authoritative, doesn't abandon "the evidence is mixed" because someone wants a cleaner answer.
-- **Reasoning engine, not a database.** Training data is reasoning capacity — for interpreting and integrating what's retrieved. It is *not* a source of evidence. Every citation, study, quote, and specific empirical claim comes only from the agent's tools, never from memory.
-- **Same calibration for every subject.** Mainstream cardiologist, alternative practitioner, longevity clinic, public figure, the user's own belief — same standard. *The discipline does not change because the subject is in the room.*
-
----
-
 ## The Methodology
 
-The application's behavior is encoded in a ~870-word system prompt that lives at `app/api/chat/systemPrompt.ts`. It is intent-bearing, not prescriptive — it gives the agent identity and discipline, not a rules list.
-
-Three load-bearing primitives operate on every input:
+A ~870-word intent-bearing system prompt at `app/api/chat/systemPrompt.ts` encodes the agent's identity and discipline. Three load-bearing primitives operate on every input:
 
 | Primitive | What it means |
 |---|---|
-| **Faithful full-context extraction** | Reconstruct the input as the complete picture in its own logic. Reasoning chains, not isolated claims. Connections to adjacent positions. Evolution over time when relevant. |
-| **Context-aware reading** | Every input lives inside a paradigm and incentive structure. See who produced it, what comparison it's embedded in, what timescale and endpoints, what's commercially or paradigmatically distorting it. |
-| **Calibrated honest verdict** | Land where the evidence actually points. Right destination, wrong route is a real verdict shape. Verdicts hold under chat pressure. |
+| **Faithful full-context extraction** | Reconstruct the input as the complete picture in its own logic — reasoning chains, not isolated claims. |
+| **Context-aware reading** | Every input lives inside a paradigm and incentive structure. See who produced it, the comparison frame, timescale, and what's distorting it. |
+| **Calibrated honest verdict** | Land where the evidence points. *Right destination, wrong route* is a real verdict shape. Verdicts hold under user pushback. |
 
-Plus several disciplines:
-
-- **First-principles biological reasoning** is the standard against which findings and frameworks are tested — not the consensus of any school, mainstream or alternative.
-- **Reading evidence at face value isn't enough.** The comparison a study makes determines what question it can answer. Acute and chronic are different phenomena. Surrogate markers can diverge from functional outcomes. Compound names often subsume heterogeneous molecules with different effects.
-- **Honest "I don't know."** When evidence is thin, when a figure hasn't said much, when sources contradict — say so. Methodology integrity is the product; sycophancy would destroy it.
-
-For the full conceptual intent, see [`docs/conceptual-intent-overview.md`](docs/conceptual-intent-overview.md).
+Plus three hard rules: **first-principles biological reasoning** is the standard (not consensus from any school); **reasoning vs. retrieval** — training data is for thinking, never for citing (every citation comes from tools); **two-pass retrieval** — a figure's primary sources tell you what they *claim*, not what the evidence shows, so triangulation runs an independent evidence pass on the topic itself.
 
 ---
 
@@ -65,12 +45,7 @@ For the full conceptual intent, see [`docs/conceptual-intent-overview.md`](docs/
 
 ### Agentic Setup
 
-A single primary agent — **Claude Opus 4.7** with adaptive thinking, summarized reasoning display, and effort `medium` — orchestrates everything in a single context window. No agent graph, no separate scoping pre-step. The methodology emerges from the system prompt + tools + reasoning, not from architectural complexity.
-
-**Why this shape:**
-- **Single context, atomic loop.** One stream, one cache, one accumulating history. Simpler to debug; faster to iterate on the methodology.
-- **Adaptive thinking with summarized display.** The agent decides whether to think between tool calls; reasoning summaries stream to the UI so the user can see *how* the agent reasons, not just what it concludes (transparency = trust).
-- **`effort: 'medium'`** — calibrated for chat speed while still giving the model space for multi-step research.
+A single primary agent — **Claude Opus 4.7** with adaptive thinking, summarized reasoning display, effort `medium` — orchestrates everything in one context window. No agent graph, no scoping pre-step. The methodology emerges from system prompt + tools + reasoning, not from architectural complexity. Reasoning summaries stream to the UI so the user sees *how* the agent reasons, not just what it concludes.
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
@@ -104,51 +79,23 @@ The end result: the agent writes precise semantic queries, gets back high-signal
 
 ### The Three Tools
 
-Three tools, not more — minimum viable for the methodology:
+| Tool | What it does | Latency |
+|---|---|---|
+| `search` | Exa semantic search → 3 results with highlighted excerpts (~1250 chars/url) | ~1–3s |
+| `read` | Exa highlights from a specific URL via custom focus query (~10K chars) | ~100–300ms |
+| `depth` | Exa full content + Gemini 3 Flash structured extraction (`insight + evidence` findings) | ~3–7s |
 
-| Tool | What it does | Latency | Notes |
-|---|---|---|---|
-| `search` | Exa semantic search → 3 results with highlighted excerpts (~1250 chars/url) | ~1–3s | Parallel calls for different search angles |
-| `read` | Exa `getContents` with highlights focused by a custom query (~10K chars from a single URL) | ~100–300ms | Default "go deeper" step; keeps the agent in direct contact with the source |
-| `depth` | Phase 1: Exa `getContents` (full text). Phase 2: Gemini 3 Flash → structured findings (`insight + evidence` pairs) via `generateObject` | ~3–7s | Full text only enters the system here, in isolation |
+Full page text only enters the system through `depth`, where Gemini Flash extracts findings in isolation — the primary agent sees structured output, never raw documents.
 
-Reasoning between tool calls is handled natively by Opus 4.7's adaptive thinking. No dedicated think tool. No agent loops or graphs.
+### Caching + Context Management
 
-### Three-Tier Anthropic Prompt Caching
+Three Anthropic cache breakpoints — **system stable** (methodology prompt), **tools** (registry), **history** (advanced each step via `prepareStep`). Dynamic system content (current date) stays uncached. Typical hit rates: 96–99%, ~57–72% cost reduction.
 
-Three cache breakpoints within Anthropic's 4-breakpoint limit:
-
-1. **System stable** — methodology system prompt (changes rarely)
-2. **Tools** — breakpoint on the last tool in the registry; Anthropic caches the entire tools section above it
-3. **History** — `prepareStep` strips prior non-system breakpoints each step and places a fresh one on the last message, advancing the cache boundary as the conversation grows
-
-System dynamic (current date) is intentionally **uncached** so it doesn't poison the stable cache. Typical hit rates: 96–99%, 57–72% cost reduction on Anthropic API calls.
-
-### Context Management
-
-Three Anthropic-managed edit tiers (`providerOptions.anthropic.contextManagement.edits`):
-
-- `clear_thinking_20251015` — `keep: 'all'` (preserves thinking blocks; protects cache stability)
-- `clear_tool_uses_20250919` — trigger at 100K input tokens; keep 15 most recent tool uses; clear at least 15K
-- `compact_20260112` — full compaction at 150K input tokens (safety net)
-
-Caching and context management coexist: caching handles cost (96–99% hit below 100K), tool-use clearing handles space, compaction is the safety net.
+Three context-edit tiers via `providerOptions.anthropic.contextManagement.edits`: thinking blocks preserved (`keep: 'all'` for cache stability), tool uses cleared at 100K input tokens (keep 15 most recent), full compaction at 150K. Caching handles cost; tool-clearing handles space; compaction is the safety net.
 
 ### Frontend Chat Shell
 
-The chat surface (Next.js 16 App Router + React 19) provides:
-
-- **Methodology-shaped onboarding.** Empty state heading + subtitle + mode-grouped starter prompts (`Extract` / `Compare` / `Triangulate`) + figure chips for 12 popular health figures. Click a chip → composer prefills with `"What does {figure} actually say about "`.
-- **Real-time tool transparency.** Each tool call renders inline as a card in the assistant message stream — spinner + actual query during retrieval, check + result domains/excerpt count when complete. The user sees the agent's research process happen, not just hears about it.
-- **Streaming markdown** with editorial-cite link styling (italic + thicker underline so citations read as deliberate references).
-- **Reasoning collapsible** — auto-opens during streaming, auto-closes 1s after the last reasoning part settles.
-- **Sources drawer** — auto-populated from inline citations, deduped via canonical URL.
-- **Edit-resubmit** on user messages — truncate and re-stream from any prior turn.
-- **Thread persistence** via Dexie / IndexedDB (`health-triangulation-threads`), with sidebar CRUD.
-- **Dark mode** via `next-themes` (system default).
-- **Restrained accent system** — neutrals + a single brand color used at exactly five surfaces.
-
-For the full frontend documentation, see [`docs/frontend-shell.md`](docs/frontend-shell.md).
+Next.js 16 + React 19. Methodology-shaped onboarding (mode-grouped starter prompts + figure chips for 12 popular health figures), real-time tool-call cards inline in the assistant message stream (queries + result domains shown as they happen), streaming markdown with editorial-cite link styling, reasoning collapsibles, auto-populated sources drawer, edit-resubmit on any prior turn, thread persistence via Dexie, dark mode, restrained accent system. Full details in [`docs/frontend-shell.md`](docs/frontend-shell.md).
 
 ---
 
@@ -157,17 +104,12 @@ For the full frontend documentation, see [`docs/frontend-shell.md`](docs/fronten
 | Layer | Technology |
 |---|---|
 | Framework | Next.js 16 (App Router) + React 19 + TypeScript |
-| Agent harness | Vercel AI SDK v6 (`streamText`, `generateObject`, tool system, `createUIMessageStream`) |
-| Primary model | Claude Opus 4.7 — adaptive thinking, summarized display, effort medium |
-| Sub-agent | Gemini 3 Flash (`gemini-3-flash-preview`) — single-document structured output |
+| Agent harness | Vercel AI SDK v6 |
+| Primary model | Claude Opus 4.7 (adaptive thinking, summarized display) |
+| Sub-agent | Gemini 3 Flash |
 | Search | Exa (`exa-js`) — semantic search with highlights |
-| Validation | Zod (tool input schemas, structured outputs) |
-| Streaming markdown | Streamdown (`mode="streaming"` while live) |
 | Persistence | Dexie / IndexedDB |
-| Theming | `next-themes` (`attribute="class"`, system default) |
-| Auto-scroll | `use-stick-to-bottom` |
-| Component baseline | ShadCN (`radix-nova` style on neutral palette) + Tailwind v4 |
-| Icons | `lucide-react` |
+| UI | ShadCN + Tailwind v4 + Streamdown + `next-themes` + `lucide-react` |
 
 ---
 
@@ -176,43 +118,18 @@ For the full frontend documentation, see [`docs/frontend-shell.md`](docs/fronten
 ```
 health-triangulation/
 ├── app/
-│   ├── api/chat/                       Backend orchestration + tools
-│   │   ├── route.ts                    POST endpoint — Opus 4.7, streaming, caching
-│   │   ├── systemPrompt.ts             Methodology system prompt (stable/dynamic)
-│   │   ├── lib/                        Cache manager, retry, retry config
-│   │   └── tools/
-│   │       ├── researchTool/           search tool + Exa client + rate limiter
-│   │       ├── readTool/               read tool — focused highlights from URL
-│   │       └── depthTool/              depth tool — full content + Gemini extraction
-│   ├── chat/                           Routed chat shell (per-thread)
-│   ├── components/                     Page-specific components (composer, message renderer)
-│   ├── globals.css                     Theme tokens, accent system, Streamdown typography
-│   ├── layout.tsx                      Root layout (Geist, ThemeProvider, TooltipProvider)
-│   └── page.tsx                        Server redirect → /chat
-│
+│   ├── api/chat/        Backend — route.ts, systemPrompt.ts, lib/, tools/ (search, read, depth)
+│   ├── chat/            Routed chat shell (per-thread)
+│   ├── components/      Composer, message renderer
+│   └── globals.css      Theme tokens, accent system, Streamdown typography
 ├── components/
-│   ├── ai-elements/                    Reusable chat UI (conversation, message, tool-call, sources, etc.)
-│   ├── ui/                             ShadCN primitives
-│   ├── app-sidebar.tsx                 Thread CRUD + active accent + mode toggle
-│   ├── chat-view.tsx                   Empty state + visibility + edit-resubmit + sources extraction
-│   ├── mode-toggle.tsx                 Light / Dark / System
-│   └── theme-provider.tsx              next-themes wrapper
-│
-├── hooks/
-│   ├── use-mobile.ts                   Breakpoint observer
-│   ├── use-persisted-chat.ts           useChat wrapper with memo'd transport
-│   └── use-thread-persistence.ts       Status-edge save (only on streaming → ready)
-│
-├── lib/
-│   ├── thread-store.ts                 Dexie schema + CRUD
-│   ├── message-utils.ts                Citation extraction, message-text extraction
-│   └── utils.ts                        cn, canonicalizeUrlForDedupe
-│
-└── docs/
-    ├── backend-harness.md              Backend technical state
-    ├── frontend-shell.md               Frontend technical state
-    ├── conceptual-intent-overview.md   Product intent & design philosophy
-    └── other-project.md                Reference foundational agent + agentic principles
+│   ├── ai-elements/     Reusable chat UI (conversation, message, tool-call, sources, …)
+│   ├── ui/              ShadCN primitives
+│   ├── app-sidebar.tsx  Thread CRUD + mode toggle
+│   └── chat-view.tsx    Empty state, visibility, edit-resubmit, sources extraction
+├── hooks/               use-mobile, use-persisted-chat, use-thread-persistence
+├── lib/                 thread-store, message-utils, utils
+└── docs/                backend-harness, frontend-shell, conceptual-intent-overview, other-project
 ```
 
 ---
@@ -227,15 +144,13 @@ health-triangulation/
 
 ### API Keys
 
-You need three keys. Sign up and grab them:
-
-| Service | Where | What it powers |
+| Service | Where | Powers |
 |---|---|---|
-| **Anthropic** | [console.anthropic.com](https://console.anthropic.com) | Claude Opus 4.7 — the primary reasoning agent |
-| **Google AI** | [ai.google.dev](https://ai.google.dev) | Gemini 3 Flash — the depth-extraction sub-agent |
-| **Exa** | [dashboard.exa.ai](https://dashboard.exa.ai) | Semantic search, focused highlights, full content retrieval |
+| **Anthropic** | [console.anthropic.com](https://console.anthropic.com) | Claude Opus 4.7 — primary agent |
+| **Google AI** | [ai.google.dev](https://ai.google.dev) | Gemini 3 Flash — depth extraction |
+| **Exa** | [dashboard.exa.ai](https://dashboard.exa.ai) | Semantic search, highlights, full content |
 
-Anthropic and Exa both require account credit / a paid plan to actually serve requests in volume; the agent is calibrated for Opus, which is more expensive per token (the three-tier prompt caching is what makes this economically viable in chat — a typical session hits 96–99% cache and 57–72% cost reduction vs. uncached).
+Anthropic and Exa require account credit. Three-tier prompt caching keeps Opus economically viable — typical sessions hit 96–99% cache, ~60% cost reduction vs. uncached.
 
 ### Clone and Install
 
@@ -282,15 +197,11 @@ npx tsc --noEmit    # Type check (strict mode, no emit)
 
 ## How It Works (in 30 seconds)
 
-You ask: *"Compare Peter Attia and Paul Saladino on LDL — and what does the evidence support?"*
+Ask: *"Compare Peter Attia and Paul Saladino on LDL — and what does the evidence support?"*
 
-1. **Scoping.** The agent confirms what's being asked (already clear here).
-2. **Acquisition pass 1 (perspectives).** It searches Exa for primary sources of what each figure has said on LDL — long-form considered content, not fragments. Highlighted excerpts (1250 chars/result) flow directly into the agent's context. If a particular source warrants going deeper, it uses `read` for focused excerpts (10K chars) or `depth` for full structured extraction via Gemini Flash.
-3. **Acquisition pass 2 (independent evidence).** Separately from the figure-extraction sources, it does fresh searches for the underlying research on LDL — RCTs, Mendelian randomization, mechanism studies, mainstream and alternative reviews. Independent of how either figure framed or cited.
-4. **Triangulation.** It reconstructs each figure's actual reasoning chain, identifies where they agree/disagree, then assesses each claim against the independent evidence with calibration — naming where each figure is confirmed, partially supported, overstated, or unsupported, including any *right destination, wrong route* nuance.
-5. **Response.** Free-form analytical prose with inline `[Title](URL)` citations on every sourced claim. Sources drawer auto-populates. Verdict holds under pushback.
+The agent runs **two distinct retrieval passes**: first acquiring each figure's actual position from primary sources (long-form considered content weighted over fragments), then *independently* retrieving the underlying research on LDL — RCTs, Mendelian randomization, mechanism studies — separate from anything either figure cited or framed. It triangulates each claim against that independent evidence with calibration (confirmed / partially supported / overstated / etc., including *right destination, wrong route* nuance), and renders the verdict as analytical prose with inline `[Title](URL)` citations.
 
-You see all of this happen in real time — the actual queries the agent wrote, the domains coming back, the reasoning collapsibles — because transparency is the trust mechanism.
+You see it happen in real time — the actual queries the agent wrote, the domains coming back, the reasoning collapsibles — because transparency is the trust mechanism.
 
 ---
 
