@@ -36,11 +36,46 @@ import {
   ChevronUp,
 } from "lucide-react";
 
-const STARTER_PROMPTS: ReadonlyArray<string> = [
-  "What does Peter Attia actually say about apoB and heart disease?",
-  "Compare Andrew Huberman and Peter Attia on saturated fat.",
-  "Where does Ray Peat get PUFA right, and where is he overstating?",
-  "Compare Peter Attia, Paul Saladino, and the evidence on LDL.",
+const STARTER_GROUPS: ReadonlyArray<{
+  label: string;
+  prompts: ReadonlyArray<string>;
+}> = [
+  {
+    label: "Extract",
+    prompts: [
+      "What does Peter Attia actually say about apoB and heart disease?",
+      "What does Andrew Huberman say about cold exposure and dopamine?",
+    ],
+  },
+  {
+    label: "Compare",
+    prompts: [
+      "Compare Andrew Huberman and Peter Attia on saturated fat.",
+      "Where do Ray Peat and Paul Saladino disagree on PUFA?",
+    ],
+  },
+  {
+    label: "Triangulate",
+    prompts: [
+      "Where does Ray Peat get PUFA right, and where is he overstating?",
+      "Compare Peter Attia, Paul Saladino, and the evidence on LDL.",
+    ],
+  },
+];
+
+const FIGURES: ReadonlyArray<string> = [
+  "Andrew Huberman",
+  "Casey Means",
+  "Chris Masterjohn",
+  "Chris Palmer",
+  "David Sinclair",
+  "Layne Norton",
+  "Mark Hyman",
+  "Mike Israetel",
+  "Paul Saladino",
+  "Peter Attia",
+  "Ray Peat",
+  "Rhonda Patrick",
 ];
 
 function useMessageVisibility(messages: UIMessage[]) {
@@ -109,6 +144,20 @@ export function ChatView({
   const isStreaming = status === "submitted" || status === "streaming";
 
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [composerText, setComposerText] = useState("");
+
+  const seedComposer = useCallback((text: string) => {
+    setComposerText(text);
+    requestAnimationFrame(() => {
+      const textarea = document.querySelector<HTMLTextAreaElement>(
+        'textarea[name="message"]',
+      );
+      if (textarea) {
+        textarea.focus();
+        textarea.setSelectionRange(text.length, text.length);
+      }
+    });
+  }, []);
 
   const {
     visibleMessages,
@@ -174,29 +223,64 @@ export function ChatView({
               Extract what a public health figure actually says on a topic —
               and triangulate it honestly against the best evidence.
             </p>
-            <div className="mt-10 flex w-full max-w-[36rem] flex-col gap-0.5">
-              {STARTER_PROMPTS.map((prompt) => (
-                <button
-                  key={prompt}
-                  type="button"
-                  onClick={() => sendMessage({ text: prompt })}
-                  className={cn(
-                    "group flex items-start gap-3 rounded-md px-3 py-2.5 text-left text-sm",
-                    "text-muted-foreground transition-colors",
-                    "hover:bg-muted/50 hover:text-foreground",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
-                  )}
-                >
-                  <ArrowRight
-                    className={cn(
-                      "mt-px size-3.5 shrink-0 text-muted-foreground/60",
-                      "transition-all group-hover:translate-x-0.5 group-hover:text-foreground/80",
-                    )}
-                    aria-hidden="true"
-                  />
-                  <span className="leading-snug">{prompt}</span>
-                </button>
+
+            <div className="mt-10 flex w-full max-w-[36rem] flex-col gap-6">
+              {STARTER_GROUPS.map((group) => (
+                <div key={group.label}>
+                  <div className="px-3 text-left text-[11px] font-medium uppercase tracking-wider text-muted-foreground/70">
+                    {group.label}
+                  </div>
+                  <div className="mt-1.5 flex flex-col gap-0.5">
+                    {group.prompts.map((prompt) => (
+                      <button
+                        key={prompt}
+                        type="button"
+                        onClick={() => sendMessage({ text: prompt })}
+                        className={cn(
+                          "group flex items-start gap-3 rounded-md px-3 py-2.5 text-left text-sm",
+                          "text-muted-foreground transition-colors",
+                          "hover:bg-muted/50 hover:text-foreground",
+                          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
+                        )}
+                      >
+                        <ArrowRight
+                          className={cn(
+                            "mt-px size-3.5 shrink-0 text-muted-foreground/60",
+                            "transition-all group-hover:translate-x-0.5 group-hover:text-foreground/80",
+                          )}
+                          aria-hidden="true"
+                        />
+                        <span className="leading-snug">{prompt}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
               ))}
+            </div>
+
+            <div className="mt-10 w-full max-w-[36rem]">
+              <div className="px-3 text-left text-[11px] font-medium uppercase tracking-wider text-muted-foreground/70">
+                Or start with a figure
+              </div>
+              <div className="mt-2 flex flex-wrap gap-1.5 px-3">
+                {FIGURES.map((figure) => (
+                  <button
+                    key={figure}
+                    type="button"
+                    onClick={() =>
+                      seedComposer(`What does ${figure} actually say about `)
+                    }
+                    className={cn(
+                      "rounded-full border border-border/70 bg-background px-3 py-1 text-xs",
+                      "text-muted-foreground transition-colors",
+                      "hover:bg-muted/50 hover:text-foreground hover:border-border",
+                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
+                    )}
+                  >
+                    {figure}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         </div>
@@ -339,7 +423,13 @@ export function ChatView({
         </div>
       )}
 
-      <ChatComposer onSubmit={sendMessage} status={status} onStop={stop} />
+      <ChatComposer
+        onSubmit={sendMessage}
+        status={status}
+        onStop={stop}
+        value={composerText}
+        onValueChange={setComposerText}
+      />
     </div>
   );
 }

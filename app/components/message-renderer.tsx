@@ -1,9 +1,10 @@
 "use client";
 
-import type { UIMessage } from "ai";
+import { type UIMessage, isToolUIPart, getToolName } from "ai";
 import NextImage from "next/image";
 import { Response } from "@/components/ai-elements/response";
 import { Reasoning } from "@/components/ai-elements/reasoning";
+import { ToolCall } from "@/components/ai-elements/tool-call";
 
 interface MessageRendererProps {
   message: UIMessage;
@@ -14,6 +15,19 @@ export function MessageRenderer({ message, isStreaming }: MessageRendererProps) 
   return (
     <>
       {message.parts.map((part, idx) => {
+        if (message.role === "assistant" && isToolUIPart(part)) {
+          return (
+            <ToolCall
+              key={idx}
+              toolName={getToolName(part)}
+              state={part.state}
+              input={"input" in part ? part.input : undefined}
+              output={"output" in part ? part.output : undefined}
+              errorText={"errorText" in part ? part.errorText : undefined}
+            />
+          );
+        }
+
         switch (part.type) {
           case "text":
             if (!part.text.trim()) return null;

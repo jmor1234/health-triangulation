@@ -19,6 +19,8 @@ interface ChatComposerProps {
   status: ChatStatus;
   onStop: () => void;
   disabled?: boolean;
+  value: string;
+  onValueChange: (value: string) => void;
 }
 
 export function ChatComposer({
@@ -26,6 +28,8 @@ export function ChatComposer({
   status,
   onStop,
   disabled,
+  value,
+  onValueChange,
 }: ChatComposerProps) {
   const handleSubmit = useCallback(
     (
@@ -39,11 +43,12 @@ export function ChatComposer({
       const trimmed = text?.trim();
       if (trimmed) {
         onSubmit({ text: trimmed, files });
+        onValueChange("");
       } else if (files && files.length > 0) {
         onSubmit({ files });
       }
     },
-    [onSubmit, status],
+    [onSubmit, status, onValueChange],
   );
 
   const handleStopClick = useCallback(
@@ -88,6 +93,8 @@ export function ChatComposer({
             rows={1}
             data-status={status}
             disabled={disabled}
+            value={value}
+            onChange={(e) => onValueChange(e.target.value)}
           />
         </div>
 
