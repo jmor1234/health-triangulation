@@ -1,6 +1,6 @@
 # Frontend Shell — Current State
 
-The chat surface for Health Triangulation. Sits on top of the backend harness documented in `backend-harness.md`. The methodology-specific UI (calibration tier badges, layered report markers, per-perspective source attribution) is **not yet built** — mount points are flagged below.
+The chat surface for Health Triangulation. Sits on top of the backend harness documented in `backend-harness.md`. The methodology-shaped onboarding (mode-grouped starter prompts, figure chips) and real-time research transparency (inline tool activity cards) are in place. The remaining methodology-specific surfaces (calibration tier badges, layered report markers, per-perspective source attribution, compaction notice, interview form) are **not yet built** — mount points are flagged below.
 
 ---
 
@@ -12,19 +12,24 @@ The chat surface for Health Triangulation. Sits on top of the backend harness do
 - Streaming chat via `useChat` + memo'd `DefaultChatTransport` (50ms throttle)
 - Thread persistence via Dexie (`health-triangulation-threads`) with status-edge save (writes only on `streaming → ready`)
 - Sidebar with thread CRUD: list, rename inline, delete, "+ New conversation," cookie-persisted collapse
-- AI Elements primitives: `Conversation` (StickToBottom), `Message`, `Response` (Streamdown), `Reasoning`, `ToolStatus`, `Sources`, `PromptInput`, `Loader`, message copy/edit
+- AI Elements primitives: `Conversation` (StickToBottom), `Message`, `Response` (Streamdown), `Reasoning`, `ToolStatus`, `ToolCall`, `Sources`, `PromptInput`, `Loader`, message copy/edit
 - Edit-resubmit on user messages (truncates and re-streams from that turn)
 - "Show previous" toggle keyed to last user message id (default view: last user→assistant pair only)
 - Sources drawer auto-populated from inline citations in the latest assistant message
 - Reasoning collapsible: auto-opens during streaming, auto-closes 1s after the last reasoning part settles (multi-step safe)
-- Tool status indicator floats above composer during in-flight tool calls
+- **Real-time tool activity cards** — each tool call renders inline in the assistant message stream, transitioning from in-flight (spinner + actual query) to complete (check + result preview); search shows top 3 result domains, read shows excerpt count, depth shows finding count
+- Tool status pill (ambient) still floats above composer during in-flight calls
+- **Methodology-shaped empty state** — heading, subtitle, mode-grouped starter prompts (`Extract` / `Compare` / `Triangulate` with 2 examples each), figure chip row (12 popular figures), composer below as freeform escape
+- **Composer prefill flow** — clicking a figure chip seeds the composer with `"What does {figure} actually say about "` and focuses the cursor at the end (composer is controlled, lifted to ChatView)
 - Dark mode via `next-themes` with system default; mode toggle in sidebar header
 - Restrained accent system (single brand color, five surfaces only)
+- **Editorial citation styling** — inline links rendered italic with thicker visible underline so citations read as deliberate references, not just underlined words
+- **Refined paragraph typography** — `leading-[1.8]` line-height + `mb-5` paragraph margin for comfortable long-form reading
 
 **Not built yet:**
-- Calibration tier badges on assistant messages
+- Calibration tier badges on assistant messages (Phase 2 — schema-as-contract)
 - Layered report-analysis rendering (findings / interpretations / recommendations)
-- Per-perspective source attribution (grouped sources)
+- Per-perspective source attribution (grouped sources for multi-figure triangulation)
 - Compaction event surfacing in-stream
 - User-belief structured interview UI
 - File upload UI for health reports (the primitive `PromptInputAttachments` row is wired for drag-drop/paste; no toolbar trigger yet)
@@ -94,20 +99,21 @@ app/
 │       ├── page.tsx            Server: <ChatPage key={threadId} threadId={threadId} />
 │       └── chat-page.tsx       Client: usePersistedChat → ChatView
 └── components/
-    ├── chat-composer.tsx       Mobile-fixed / desktop-sticky composer, accent submit, attachments row
-    └── message-renderer.tsx    Dispatches on part.type (text → Response, reasoning → Reasoning, file → Image, tool → null)
+    ├── chat-composer.tsx       Mobile-fixed / desktop-sticky composer; controlled value via ChatView (figure chip seeding)
+    └── message-renderer.tsx    Dispatches on part.type (text → Response, reasoning → Reasoning, file → Image, tool → ToolCall card)
 
 components/
 ├── theme-provider.tsx          next-themes wrapper
 ├── mode-toggle.tsx             Sun/Moon dropdown (Light / Dark / System)
 ├── app-sidebar.tsx             Thread list, CRUD, active accent, mode toggle
-├── chat-view.tsx               Visibility toggle, edit-resubmit, sources extraction, tool-status, error banner
+├── chat-view.tsx               Visibility toggle, edit-resubmit, sources extraction, tool-status, error banner; mode-grouped starter prompts + figure chips empty state; composer text state lifted here for prefill
 └── ai-elements/
     ├── conversation.tsx        StickToBottom wrapper + scroll button
     ├── message.tsx             User bubble (bg-secondary), assistant document-style
     ├── response.tsx            Memo'd Streamdown (mode="streaming" while live)
     ├── reasoning.tsx           Auto-open/close, duration dot, last-part-keyed timer
-    ├── tool-status.tsx         Accent pill, pulsing dot
+    ├── tool-status.tsx         Accent pill, pulsing dot (ambient at-a-glance indicator above composer)
+    ├── tool-call.tsx           Inline real-time card: per-tool icon, query/URL, state indicator (spinner/check/alert), output preview
     ├── sources.tsx             Collapsible drawer, favicon-prefixed list, dedupe-cap-8
     ├── prompt-input.tsx        Compound: PromptInput / Textarea / Toolbar / Submit / Attachments
     ├── loader.tsx              Vercel-style spoke spinner
@@ -125,6 +131,41 @@ lib/
 ├── message-utils.ts            extractMessageText, extractCitationUrls
 └── utils.ts                    cn + canonicalizeUrlForDedupe
 ```
+
+---
+
+## Methodology Surfaces in the Shell
+
+Two surfaces in the shell teach the methodology directly through interaction:
+
+### Empty state (`chat-view.tsx`)
+
+Three concentric layers of guidance, no separate routes or pickers:
+
+1. **Heading + subtitle** — *"Health Triangulation. Extract what a public health figure actually says on a topic — and triangulate it honestly against the best evidence."* States what the product is in one read.
+
+2. **Mode-grouped starter prompts** (`STARTER_GROUPS`) — three small sections labeled `EXTRACT` / `COMPARE` / `TRIANGULATE`, each with two example queries. The mode labels do pedagogical work — a new user immediately sees the three operating shapes of the product. Click any prompt → `sendMessage({ text: prompt })` (submits immediately).
+
+3. **Figure chips row** (`FIGURES`, 12 popular figures, alphabetical: Andrew Huberman, Casey Means, Chris Masterjohn, Chris Palmer, David Sinclair, Layne Norton, Mark Hyman, Mike Israetel, Paul Saladino, Peter Attia, Ray Peat, Rhonda Patrick) — click any chip → `seedComposer("What does {figure} actually say about ")` which sets the controlled composer text and focuses the cursor at the end. User types the topic and submits.
+
+Composer below remains the unconstrained freeform escape — type any figure, any phrasing.
+
+### Real-time tool activity cards (`tool-call.tsx`)
+
+Each tool call renders inline in the assistant message stream, in temporal order, showing the agent's research process as it happens.
+
+Per-tool detail when state is `output-available`:
+
+| Tool | Header label | Primary | Preview |
+|---|---|---|---|
+| `search` | Search | the actual query string | first 3 result domains, deduped via `canonicalizeUrlForDedupe` |
+| `read` | Read | domain (parsed from URL) + focus query | `{N} excerpts` |
+| `depth` | Extract | domain + objective | `{N} findings` |
+| (other) | tool name | first string in input | (none) |
+
+State transitions: `input-streaming` / `input-available` show a spinner; `output-available` shows a check (fades in); `output-error` shows an alert. The card is purely visual record — not clickable; the Sources drawer at message end is the canonical clickable surface.
+
+The floating `ToolStatus` pill stays as an ambient at-a-glance indicator below messages — it complements (doesn't compete with) the inline cards. The cards show *the search process*; the Sources drawer at message end shows *the cited evidence*. Different surfaces.
 
 ---
 
@@ -185,9 +226,11 @@ These are the bugs the code is actively defending against. Worth knowing before 
 - **R7 — Tailwind v4 token aliasing:** new tokens need BOTH `:root`/`.dark` declarations AND `@theme inline { --color-... }` aliases for `bg-*` / `text-*` utilities
 - **R8 — Reasoning auto-close timer:** keyed on last reasoning part timestamp, not global `status`
 - **R9 — `display: 'summarized'` reasoning visibility:** route already sets it; `message-renderer` must dispatch `reasoning` parts to `<Reasoning>`
-- **R10 — Tool result rendering:** `message-renderer` returns `null` for tool parts; otherwise raw JSON renders inline
+- **R10 — Tool part rendering:** `message-renderer` dispatches tool parts to `<ToolCall />` (was previously `null`); skipping the dispatch lets raw JSON tool results render inline via Streamdown
 - **R11 — IndexedDB private-mode:** Dexie writes can fail; persistence is wrapped to fail soft
 - **R12 — Edit + mid-stream:** edit save guarded on `status === 'ready'`
+- **R13 — Composer controlled state:** composer text is lifted to `ChatView` (`composerText` + `setComposerText`) so figure chips can seed it via `seedComposer(text)`. The inner `PromptInputTextarea` is controlled via `value` + `onChange`. On submit, `onValueChange("")` must be called to clear (the form's native `reset()` is a no-op for a controlled textarea).
+- **R14 — `display: 'summarized'` placement:** in `route.ts`, this lives **inside** `thinking: { type: 'adaptive', display: 'summarized' }`, NOT as a sibling at the top of `providerOptions.anthropic`. Wrong placement is silently dropped by Zod's strip mode and Anthropic returns redacted thinking blocks → empty Reasoning components.
 
 ---
 
@@ -217,12 +260,12 @@ These are the seams already shaped to receive the methodology surfaces. Not impl
 
 ## What's Next
 
-Frontend-side, in approximate order — all gated on the methodology layer landing first:
+The methodology system prompt is now in place and producing calibrated, figure-driven, retrieval-grounded output in prose. The shell already surfaces real-time research activity via tool cards. Remaining frontend work all centers on making the methodology's structural commitments mechanically visible:
 
-1. **Calibration tier UI** — once the system prompt + schema decide the tier mechanism, render badges at the mount point above with the separate token family
-2. **Report upload + layered rendering** — file part wiring is partially in place via `PromptInputAttachments`; needs a toolbar trigger and the `report-layers.tsx` component
-3. **Per-perspective source grouping** — minimal SourceList extension once the backend tags citations
-4. **Compaction notice** — one-line component mounted on `data-context-edit` parts
-5. **User-belief interview component** — structured form surfaced via custom part type when the system prompt initiates an interview turn
+1. **Calibration tier badges** — highest-leverage next move. Render a structured tier commitment (`confirmed / partially supported / overstated / etc.`) as a badge under each verdict, driven by a `data-calibration` UI message part written from the route. Uses a separate token family (`--tier-confirmed`, `--tier-overstated`, etc.) so verdicts read as their own semantic surface, distinct from `--accent-brand`.
+2. **Per-perspective source grouping** — extend `SourceList` with optional `groups: { label, sources }[]` once the backend tags citations with `perspective`. Lets multi-figure triangulation queries show which sources informed which figure's view.
+3. **Report upload + layered rendering** — file part wiring is partially in place via `PromptInputAttachments`; needs a toolbar trigger plus a `report-layers.tsx` component for findings / interpretations / recommendations layers.
+4. **Compaction notice** — one-line component mounted on `data-context-edit` parts emitted from `route.ts`'s `onFinish`.
+5. **User-belief interview component** — structured form surfaced via custom part type when the system prompt initiates an interview turn.
 
-The shell is the foundation. The methodology is what gives it meaning.
+The shell is the foundation. The methodology system prompt is what gives it meaning. The next features make the methodology *auditable* — turning prose verdicts into structured commitments the user can scan and trust.

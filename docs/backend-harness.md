@@ -1,6 +1,6 @@
 # Backend Harness — Current State
 
-The orchestration + retrieval layer for Health Triangulation. The methodology layer (system prompt, calibration schemas, report-analysis flow) is **not yet built** — what's here is the harness that those layers will sit on top of. The frontend chat shell that consumes this harness is documented separately in `frontend-shell.md`.
+The orchestration + retrieval layer for Health Triangulation. The methodology system prompt is now in place and load-bearing; remaining methodology features (calibration schemas, report-analysis flow, user-belief interview) are still pending. The frontend chat shell that consumes this harness is documented separately in `frontend-shell.md`.
 
 ---
 
@@ -15,15 +15,13 @@ The orchestration + retrieval layer for Health Triangulation. The methodology la
 - Per-phase retry with timeout, exponential backoff, jitter, `Retry-After` respect
 - Anthropic context-management edits (clear thinking, clear tool uses, compact)
 - Per-request telemetry: tool counts, token usage, cache hit rate, cost vs. baseline, context-edit events
-
-**Placeholder (deliberate):**
-- `systemPrompt.ts` — minimal instructions used to verify end-to-end. The methodology prompt (faithful extraction, context-aware reading, calibrated honest verdicts) replaces this next.
+- **Methodology system prompt** — figure-driven triangulation discipline encoded across nine sections; ~870 words; intent-bearing rather than prescriptive (see "Methodology System Prompt" below)
 
 **Not built yet:**
-- Methodology system prompt (the actual product)
 - Report-analysis flow (provider epistemic profile + three-layer schema)
 - User-belief in-chat interview behavior
 - Calibration tier as structured output / visible commitment / UI badges
+- Compaction event surfacing in the UI (when `compact_20260112` fires)
 
 ---
 
@@ -99,7 +97,7 @@ POST /api/chat
 ```
 app/api/chat/
 ├── route.ts                              POST endpoint — Opus 4.7, streaming, caching, tools
-├── systemPrompt.ts                       Placeholder system prompt (stable/dynamic split)
+├── systemPrompt.ts                       Methodology system prompt (stable/dynamic split)
 │
 ├── lib/
 │   ├── cacheManager.ts                   Three-tier Anthropic prompt caching
@@ -157,6 +155,49 @@ Promise-chained dispatch — controls when requests *start*, not when they execu
 
 ---
 
+## Methodology System Prompt
+
+Lives in `app/api/chat/systemPrompt.ts`. Stable/dynamic split: stable carries the methodology (cached); dynamic carries the current date (uncached, doesn't poison the system cache).
+
+**Core framing:** the canonical input is a *figure-on-topic*. The agent extracts what a specific public health figure actually says on a topic in their full nuanced reasoning, then (when asked) compares to another figure and/or triangulates against the best evidence with first-principles biological reasoning.
+
+**Structure (nine sections, ~870 words):**
+
+| Section | What it encodes |
+|---|---|
+| Identity / scope | What the agent is and isn't (rigorous epistemic triangulator, not a clinician, anything health/biology in scope) |
+| **Reasoning vs. Retrieval** | Hard rule: training data is reasoning capacity, not a source of evidence. Citations come only from tools. Fabricated citations destroy the methodology's foundation. |
+| **How You Think** | Cognitive posture: substrate-level reasoning, cross-domain integration, depth over speed, first-principles biological reasoning as the test of truth (not consensus from any school) |
+| **How You Operate** | Three primitives: Faithful full-context extraction · Context-aware reading · Calibrated honest verdict (with right-destination/wrong-route as a real verdict shape) |
+| **Reading Evidence** | Eight-sentence discipline for evaluating research: comparison frame, acute vs. chronic, surrogate vs. functional endpoints, chemical conflation, mechanism vs. clinical, integration over isolated findings |
+| **Discipline** | Behavior under chat dynamics: scope before searching, same-calibration for every subject, neither mainstream-defending nor contrarian, honest "I don't know" |
+| **Acquisition** | Figure-on-topic as canonical input shape; user-thinking and report inputs as parallel extensions |
+| **Triangulating Against Evidence** | Two-pass retrieval rule: a figure's primary sources tell you what they claim, not what the evidence shows. Independent retrieval pass on the topic itself, separate from the figure's framing. |
+| Response | Free-form analytical prose with inline citations; lead with the answer; hand the decision back to the user |
+
+**Deliberately NOT in the prompt** (to respect the agentic separation-of-concerns rule — *prompt = global intent, schema = contract*):
+
+- Six-tier calibration vocabulary (`confirmed / partially supported / overstated / etc.`) — this is schema territory for the future calibration-badge surface; the prompt encodes the *discipline* of arriving honestly at a tier, not the tier names
+- Tool usage instructions (when to call search vs. read vs. depth) — tool descriptions carry that
+- Output formatting specifics — the chat surface and Streamdown handle that
+- Per-mode operational steps (solo / comparison / triangulation / report) — emergent from primitives + input shape
+
+**Provider options on the Anthropic call:**
+
+```ts
+providerOptions: {
+  anthropic: {
+    thinking: { type: 'adaptive', display: 'summarized' },
+    effort: 'medium',
+    contextManagement: { edits: [...] },
+  },
+}
+```
+
+`display: 'summarized'` lives **inside** the `thinking` object, not at the top level. (This was a real bug — when placed at the top level, Zod's strip mode silently drops it and Anthropic returns redacted thinking blocks with empty content.)
+
+---
+
 ## Adaptations From the Foundational Agent Reference
 
 The reference at `docs/other-project.md` is the lineage. Adaptations made for this project:
@@ -209,9 +250,10 @@ The reference at `docs/other-project.md` is the lineage. Adaptations made for th
 
 In approximate order:
 
-1. **System prompt rewrite** — the methodology layer. Intent + role + way of being. Compact, not a rules list. Calibration tier mechanism decided here (schema-as-contract vs. prompt-as-guideline).
-2. **Report-analysis flow** — file upload → provider epistemic profile → three-layer structured analysis (findings / interpretations / recommendations). Likely a `generateObject` sub-call with a health-report-aware schema, invoked when a file part is attached.
-3. **Calibration UI** — visible tier badges, source attribution per perspective, layer markers on report analysis. Transparency surfaces that make the methodology auditable. (Mount points already flagged in the frontend doc.)
-4. **Compaction event surfacing** — render distinctly when an applied edit of `type: 'compact_20260112'` shows up in step metadata, so the user knows when context was summarized.
+1. **Calibration tier as structured commitment** — emit a `data-calibration` UI message part from the route carrying `{ tier, subject, justification }`. The system prompt already encodes the calibration *discipline*; this adds the *mechanical commitment* that makes verdicts auditable badges. The vocabulary (six-tier scale) lives in the schema, not the prompt.
+2. **Per-perspective source tagging** — extend tool calls / route to tag retrieval with a `perspective` field so multi-figure triangulations can show which sources informed which figure's view. Frontend `SourceList` already has the optional `groups` extension flagged.
+3. **Report-analysis flow** — file upload → provider epistemic profile → three-layer structured analysis (findings / interpretations / recommendations). Likely a `generateObject` sub-call with a health-report-aware schema, invoked when a file part is attached.
+4. **Compaction event surfacing** — emit a `data-context-edit` part inside `onFinish`'s applied-edits loop so the UI can render a quiet inline notice when context was summarized.
+5. **User-belief in-chat interview** — structured question shape surfaced when the system prompt initiates an interview turn. Schema + UI message part.
 
-The harness is the foundation. The frontend chat shell is the surface (see `frontend-shell.md`). **The methodology is the product** — which is why the system prompt + schemas + UI surfaces are where the next real work lives.
+The harness is the foundation. The frontend chat shell is the surface (see `frontend-shell.md`). **The methodology is the product** — which now lives in `systemPrompt.ts` and is exercised end-to-end. The remaining work makes the methodology's verdicts mechanically auditable rather than only legible in prose.
