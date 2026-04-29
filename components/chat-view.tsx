@@ -37,10 +37,10 @@ import {
 } from "lucide-react";
 
 const STARTER_PROMPTS: ReadonlyArray<string> = [
-  "What does the evidence say about creatine for cognition?",
-  "Compare mainstream cardiology and Peter Attia on LDL.",
-  "Is the case against seed oils real or overstated?",
-  "What's the honest read on intermittent vs. extended fasting?",
+  "What does Peter Attia actually say about apoB and heart disease?",
+  "Compare Andrew Huberman and Peter Attia on saturated fat.",
+  "Where does Ray Peat get PUFA right, and where is he overstating?",
+  "Compare Peter Attia, Paul Saladino, and the evidence on LDL.",
 ];
 
 function useMessageVisibility(messages: UIMessage[]) {
@@ -171,8 +171,8 @@ export function ChatView({
               Health Triangulation
             </h1>
             <p className="mt-3 max-w-md text-sm text-muted-foreground md:text-base">
-              Rigorously triangulate health questions across primary sources,
-              perspectives, and the current evidence.
+              Extract what a public health figure actually says on a topic —
+              and triangulate it honestly against the best evidence.
             </p>
             <div className="mt-10 flex w-full max-w-[36rem] flex-col gap-0.5">
               {STARTER_PROMPTS.map((prompt) => (

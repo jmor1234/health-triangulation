@@ -84,7 +84,7 @@ export function ChatComposer({
         <div className="px-4 pt-2">
           <PromptInputTextarea
             className="min-h-0 max-h-[40svh] resize-none border-0 bg-transparent p-0 text-base placeholder:text-muted-foreground/70 focus-visible:ring-0 md:text-base"
-            placeholder="Ask anything…"
+            placeholder="Ask about a figure, a topic, or a comparison…"
             rows={1}
             data-status={status}
             disabled={disabled}
